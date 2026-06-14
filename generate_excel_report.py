@@ -1,15 +1,24 @@
+"""
+generate_excel_report.py  —  Data Quality Governance Project
+Generates a formatted Excel governance report from CSV exports.
+
+Run after export_to_csv.py to ensure CSVs are up to date.
+
+Author: Feranmi Okunola
+"""
+
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 import os
 
 # ── File paths ───────────────────────────────────────────────────────────────
-BASE   = r"C:\Users\flofa\OneDrive\Actual Project\data-covenant-initiative"
+BASE   = r"C:\Users\flofa\OneDrive\Data Quality Governance Project"
 OUTPUT = os.path.join(BASE, "Data_Governance_Report.xlsx")
 
-cde       = pd.read_csv(os.path.join(BASE, "cde_inventory.csv"))
-ctrl      = pd.read_csv(os.path.join(BASE, "control_register.csv"))
-scores    = pd.read_csv(os.path.join(BASE, "score_log.csv"))
+cde    = pd.read_csv(os.path.join(BASE, "cde_inventory.csv"))
+ctrl   = pd.read_csv(os.path.join(BASE, "control_register.csv"))
+scores = pd.read_csv(os.path.join(BASE, "score_log.csv"))
 
 # ── Sheet 1: CDE Summary ─────────────────────────────────────────────────────
 cde_summary = cde.merge(scores, on="cde_id", how="left")[[
@@ -35,8 +44,8 @@ division_pivot.columns.name = None
 
 # ── Write to Excel ────────────────────────────────────────────────────────────
 with pd.ExcelWriter(OUTPUT, engine="openpyxl") as writer:
-    cde_summary.to_excel(writer,    sheet_name="CDE Summary",               index=False)
-    breaches.to_excel(writer,       sheet_name="Active Breach Register",    index=False)
+    cde_summary.to_excel(writer,    sheet_name="CDE Summary",                index=False)
+    breaches.to_excel(writer,       sheet_name="Active Breach Register",     index=False)
     division_pivot.to_excel(writer, sheet_name="Control Status by Division", index=False)
 
 # ── Apply formatting ──────────────────────────────────────────────────────────

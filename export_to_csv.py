@@ -1,3 +1,13 @@
+"""
+export_to_csv.py  —  Data Quality Governance Project
+Exports all Supabase tables to CSV for Power BI consumption.
+
+Run after control_scorer.py to capture the latest scores.
+Then refresh Power BI Desktop to update the dashboard.
+
+Author: Feranmi Okunola
+"""
+
 import psycopg2
 import pandas as pd
 import os
@@ -14,7 +24,7 @@ conn = psycopg2.connect(
     sslmode="require"
 )
 
-BASE = r"C:\Users\flofa\OneDrive\Actual Project\data-covenant-initiative"
+BASE = r"C:\Users\flofa\OneDrive\Data Quality Governance Project"
 
 tables = [
     "cde_inventory",

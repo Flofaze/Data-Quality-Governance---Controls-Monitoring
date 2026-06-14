@@ -1,6 +1,5 @@
-
 """
-control_scorer.py  —  Data Covenant Initiative v1.0
+control_scorer.py  —  Data Quality Governance Project
 Dimensions : Completeness (BCBS 239 P4) · Accuracy (BCBS 239 P3) · Timeliness (BCBS 239 P6)
 Ownership  : ITSO (IT System Owner) · BUSO (Business Unit System Owner)
 SLA Tiers  : Derived from DAMA-DMBOK2 criticality x dimension
@@ -167,7 +166,6 @@ for cde in cdes:
     # Generate SLA records for breached/missing controls not yet tracked
     for ctrl in cde_controls:
         if ctrl["control_status"] in ("Breached", "Missing"):
-            # Check if already in sla_tracker
             cur.execute(
                 "SELECT 1 FROM sla_tracker WHERE control_id = %s AND status != 'Resolved'",
                 (ctrl["control_id"],)

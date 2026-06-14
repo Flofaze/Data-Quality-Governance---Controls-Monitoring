@@ -1,3 +1,12 @@
+"""
+update_measurements.py  —  Data Quality Governance Project
+Loads measurement data from CSV and updates control_register in Supabase.
+
+Used for initial data seeding or manual measurement updates.
+
+Author: Feranmi Okunola
+"""
+
 import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
@@ -5,7 +14,9 @@ import os
 
 load_dotenv()
 
-df = pd.read_csv(r"C:\Users\flofa\OneDrive\Actual Project\data-covenant-initiative\control_register_with_measurements.csv")
+BASE = r"C:\Users\flofa\OneDrive\Data Quality Governance Project"
+
+df = pd.read_csv(os.path.join(BASE, "control_register_with_measurements.csv"))
 
 conn = psycopg2.connect(
     host=os.getenv("DB_HOST"),

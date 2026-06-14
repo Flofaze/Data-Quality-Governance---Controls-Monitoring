@@ -1,6 +1,6 @@
 """
-simulate_pipeline.py
-Data Covenant Initiative — Pipeline Simulation Script
+simulate_pipeline.py  —  Data Quality Governance Project
+Pipeline Simulation Script
 
 Simulates realistic data quality drift between pipeline runs.
 Rather than generating completely random values, each run takes the
@@ -66,15 +66,10 @@ print(f"Fetched {len(controls)} controls from control_register")
 # ─────────────────────────────────────────────
 # DRIFT SETTINGS — widened to cross thresholds
 # ─────────────────────────────────────────────
-# Completeness thresholds: 95% and 98%  → need drift > 3% to cross
-# Accuracy thresholds:     1% and 5%    → need drift > 4% to cross
-# Timeliness thresholds:   0.5hr, 2hr   → need drift > 1.5hr to cross
+BASE_COMPLETENESS_DRIFT = 6.0
+BASE_ACCURACY_DRIFT     = 4.5
+BASE_TIMELINESS_DRIFT   = 2.0
 
-BASE_COMPLETENESS_DRIFT = 6.0   # was 3.5
-BASE_ACCURACY_DRIFT     = 4.5   # was 2.0
-BASE_TIMELINESS_DRIFT   = 2.0   # was 0.8
-
-# Criticality multipliers — Critical CDEs drift harder
 CRITICALITY_MULTIPLIER = {
     "Critical": 1.4,
     "High":     1.1,
@@ -87,35 +82,17 @@ TIMELINESS_MIN,   TIMELINESS_MAX   = 0.0,  10.0
 
 # ─────────────────────────────────────────────
 # PER-RUN DIRECTIONAL BIAS
-# Each run, ~40% of controls are tagged to worsen, ~60% to improve.
-# This ensures score_log shows meaningful changes across runs.
 # ─────────────────────────────────────────────
 def get_bias(control_id):
-    """
-    Returns +1 (worsen) or -1 (improve) for this control this run.
-    Uses control_id seeded with today's date for reproducibility
-    within a day but variation across days.
-    """
-    seed = int(datetime.now().strftime("%Y%m%d")) + control_id
+    seed = int(datetime.now().strftime("%Y%m%d%H")) + control_id
     rng = random.Random(seed)
     return 1 if rng.random() < 0.40 else -1
 
 def drift(current_value, max_drift, min_bound, max_bound, bias, higher_is_worse=False):
-    """
-    Drift a value by a random amount within max_drift, biased by direction.
-    higher_is_worse=True  → bias=+1 means increase (worsen), e.g. accuracy variance, hours late
-    higher_is_worse=False → bias=+1 means decrease (worsen), e.g. completeness pct
-    """
     current_float = float(current_value)
-    magnitude = random.uniform(max_drift * 0.3, max_drift)  # floor at 30% of max
-
-    if higher_is_worse:
-        direction = bias  # +1 = increase = worsen
-    else:
-        direction = -bias  # +1 bias = decrease = worsen for completeness
-
-    change = direction * magnitude
-    new_value = current_float + change
+    magnitude = random.uniform(max_drift * 0.3, max_drift)
+    direction = bias if higher_is_worse else -bias
+    new_value = current_float + (direction * magnitude)
     return round(max(min_bound, min(max_bound, new_value)), 2)
 
 # ─────────────────────────────────────────────
@@ -162,76 +139,48 @@ for row in controls:
 
     if dimension == "Completeness":
         current = float(completeness_pct) if completeness_pct is not None else starting_completeness(criticality)
-        max_drift = BASE_COMPLETENESS_DRIFT * multiplier
-        new_pct = drift(current, max_drift, COMPLETENESS_MIN, COMPLETENESS_MAX,
-                        bias, higher_is_worse=False)
+        new_pct = drift(current, BASE_COMPLETENESS_DRIFT * multiplier, COMPLETENESS_MIN, COMPLETENESS_MAX, bias, higher_is_worse=False)
         expected = int(expected_record_count) if expected_record_count else random.randint(900, 1000)
         actual = int(expected * new_pct / 100)
-
         m = {
-            "expected_record_count": expected,
-            "actual_record_count": actual,
-            "completeness_pct": new_pct,
-            "expected_value": None,
-            "actual_value": None,
-            "tolerance_pct": None,
-            "accuracy_variance_pct": None,
-            "expected_arrival_time": None,
-            "actual_arrival_time": None,
-            "hours_late": None,
+            "expected_record_count": expected, "actual_record_count": actual,
+            "completeness_pct": new_pct, "expected_value": None, "actual_value": None,
+            "tolerance_pct": None, "accuracy_variance_pct": None,
+            "expected_arrival_time": None, "actual_arrival_time": None, "hours_late": None,
         }
-
         if new_pct >= 98: status_preview["passing"] += 1
         elif new_pct >= 95: status_preview["partial"] += 1
         else: status_preview["breached"] += 1
 
     elif dimension == "Accuracy":
         current = float(accuracy_variance_pct) if accuracy_variance_pct is not None else starting_accuracy(criticality)
-        max_drift = BASE_ACCURACY_DRIFT * multiplier
-        new_variance = drift(current, max_drift, ACCURACY_MIN, ACCURACY_MAX,
-                             bias, higher_is_worse=True)
+        new_variance = drift(current, BASE_ACCURACY_DRIFT * multiplier, ACCURACY_MIN, ACCURACY_MAX, bias, higher_is_worse=True)
         exp_val = float(expected_value) if expected_value else round(random.uniform(100, 10000), 2)
         tol = float(tolerance_pct) if tolerance_pct else round(random.uniform(0.5, 2.0), 2)
         actual_val = round(exp_val * (1 + new_variance / 100), 2)
-
         m = {
-            "expected_record_count": None,
-            "actual_record_count": None,
-            "completeness_pct": None,
-            "expected_value": exp_val,
-            "actual_value": actual_val,
-            "tolerance_pct": tol,
-            "accuracy_variance_pct": new_variance,
-            "expected_arrival_time": None,
-            "actual_arrival_time": None,
-            "hours_late": None,
+            "expected_record_count": None, "actual_record_count": None,
+            "completeness_pct": None, "expected_value": exp_val, "actual_value": actual_val,
+            "tolerance_pct": tol, "accuracy_variance_pct": new_variance,
+            "expected_arrival_time": None, "actual_arrival_time": None, "hours_late": None,
         }
-
         if new_variance < 1: status_preview["passing"] += 1
         elif new_variance < 5: status_preview["partial"] += 1
         else: status_preview["breached"] += 1
 
     elif dimension == "Timeliness":
         current = float(hours_late) if hours_late is not None else starting_timeliness(criticality)
-        max_drift = BASE_TIMELINESS_DRIFT * multiplier
-        new_hours = drift(current, max_drift, TIMELINESS_MIN, TIMELINESS_MAX,
-                          bias, higher_is_worse=True)
+        new_hours = drift(current, BASE_TIMELINESS_DRIFT * multiplier, TIMELINESS_MIN, TIMELINESS_MAX, bias, higher_is_worse=True)
         base_time = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0)
         actual_arrival = base_time + timedelta(hours=new_hours)
-
         m = {
-            "expected_record_count": None,
-            "actual_record_count": None,
-            "completeness_pct": None,
-            "expected_value": None,
-            "actual_value": None,
-            "tolerance_pct": None,
-            "accuracy_variance_pct": None,
+            "expected_record_count": None, "actual_record_count": None,
+            "completeness_pct": None, "expected_value": None, "actual_value": None,
+            "tolerance_pct": None, "accuracy_variance_pct": None,
             "expected_arrival_time": base_time.strftime("%H:%M:%S"),
             "actual_arrival_time": actual_arrival.strftime("%H:%M:%S"),
             "hours_late": new_hours,
         }
-
         if new_hours <= 0.5: status_preview["passing"] += 1
         elif new_hours <= 2: status_preview["partial"] += 1
         else: status_preview["breached"] += 1
@@ -253,17 +202,10 @@ for row in controls:
             hours_late             = %s
         WHERE control_id = %s
     """, (
-        m["expected_record_count"],
-        m["actual_record_count"],
-        m["completeness_pct"],
-        m["expected_value"],
-        m["actual_value"],
-        m["tolerance_pct"],
-        m["accuracy_variance_pct"],
-        m["expected_arrival_time"],
-        m["actual_arrival_time"],
-        m["hours_late"],
-        control_id
+        m["expected_record_count"], m["actual_record_count"], m["completeness_pct"],
+        m["expected_value"], m["actual_value"], m["tolerance_pct"],
+        m["accuracy_variance_pct"], m["expected_arrival_time"],
+        m["actual_arrival_time"], m["hours_late"], control_id
     ))
     updated += 1
 
@@ -271,9 +213,6 @@ conn.commit()
 cur.close()
 conn.close()
 
-# ─────────────────────────────────────────────
-# SUMMARY
-# ─────────────────────────────────────────────
 total = sum(status_preview.values())
 print(f"\nDone — {updated} controls updated with drifted measurements")
 print(f"\nEstimated status distribution this run:")
